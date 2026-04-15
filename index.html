@@ -1,1 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nexus Grid</title>
+    <meta name="description" content="Static Nexus mission dashboard" />
+    <link rel="stylesheet" href="./style.css" />
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero card">
+        <div>
+          <p class="eyebrow">Static Mission Dashboard</p>
+          <h1>Nexus Grid</h1>
+          <p class="subtitle">Read-only status snapshot loaded from <code>state.json</code>.</p>
+        </div>
+        <div class="status-stack">
+          <span id="overallBadge" class="badge badge-neutral">Loading</span>
+          <p class="refresh-meta">
+            Last successful refresh: <strong id="lastRefresh">Never</strong>
+          </p>
+        </div>
+      </header>
 
+      <section id="errorBanner" class="banner banner-error" hidden></section>
+
+      <section class="grid">
+        <article class="card">
+          <div class="card-head">
+            <h2>Mission Control</h2>
+          </div>
+          <dl class="kv-list" id="missionControlList"></dl>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <h2>Engine Status</h2>
+          </div>
+          <dl class="kv-list" id="engineStatusList"></dl>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <h2>Signal</h2>
+          </div>
+          <dl class="kv-list" id="signalList"></dl>
+        </article>
+
+        <article class="card wide-card">
+          <div class="card-head">
+            <h2>Execution</h2>
+          </div>
+          <div id="executionArea" class="execution-area"></div>
+        </article>
+
+        <article class="card wide-card">
+          <div class="card-head">
+            <h2>Raw State</h2>
+          </div>
+          <pre id="rawState" class="raw-state">Loading state...</pre>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

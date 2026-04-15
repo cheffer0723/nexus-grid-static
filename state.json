@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-04-15T15:46:00Z",
+  "system_status": {
+    "mode": "paper_spot",
+    "running": true,
+    "risk_level": "medium",
+    "trading_allowed": true,
+    "updated_at": "2026-04-15T15:46:00Z"
+  },
+  "health": {
+    "brokerConnected": true
+  },
+  "control_state": {
+    "emergencyStopActive": false,
+    "requested": false,
+    "stopRequestedAt": null,
+    "stopSource": null
+  },
+  "signal_latest": {
+    "symbol": "BTC-USD",
+    "action": "hold",
+    "market_bias": "bullish",
+    "volatility_state": "EXPANDING",
+    "bullish_score": 0.71,
+    "bearish_score": 0.29,
+    "net_score": 0.42,
+    "timestamp_utc": "2026-04-15T15:44:26Z"
+  },
+  "executions_recent": [
+    {
+      "summary": "Closed BTC long after target hit.",
+      "status": "CLOSED",
+      "symbol": "BTC-USD",
+      "side": "long",
+      "qty": 0.0008,
+      "entry_price": 73880.2,
+      "exit_price": 74038.5,
+      "pnl_abs": -0.07134642,
+      "pnl_pct": -0.00285386,
+      "timestamp_utc": "2026-04-15T15:24:17.243099Z"
+    }
+  ]
+}
