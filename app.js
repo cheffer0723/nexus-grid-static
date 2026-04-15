@@ -1,5 +1,5 @@
 const REFRESH_MS = 10_000;
-const STATE_URL = './state.json';
+const STATE_URL = 'https://critical-mass-lab-production.up.railway.app/state';
 
 const state = {
   raw: null,
