@@ -58,6 +58,8 @@ function renderDashboard(data) {
     health.tradingAllowed,
     control.tradingAllowed,
     control.trading_allowed,
+    signal.canTrade,
+    signal.can_trade,
   ), false);
 
   const engineRunning = asBool(firstDefined(
@@ -88,15 +90,15 @@ function renderDashboard(data) {
     ['Trading allowed', boolLabel(tradingAllowed)],
     ['Engine running', boolLabel(engineRunning)],
     ['Mode', textOr(system.mode, 'Unknown')],
-    ['Risk level', textOr(system.risk_level ?? system.riskLevel, 'Unknown')],
-    ['Last update time', formatDateTime(firstDefined(system.updated_at, system.updatedAt, data.updated_at, data.timestamp_utc, data.timestamp), true)],
+    ['Risk level', textOr(system.risk_level ?? system.riskLevel ?? system.riskState, 'Unknown')],
+    ['Last update time', formatDateTime(firstDefined(payload.meta?.generated_at_utc, system.lastHeartbeat, data.received_at_utc, system.updated_at, system.updatedAt, data.updated_at, data.timestamp_utc, data.timestamp), true)],
   ]);
 
   renderKeyValues(els.engineStatusList, [
     ['Running / stopped', engineRunning ? 'Running' : 'Stopped'],
-    ['Broker connected', boolLabel(firstDefined(health.brokerConnected, health.broker_connected, false), false)],
+    ['Broker connected', boolLabel(firstDefined(system.brokerConnected, system.broker_connected, health.brokerConnected, health.broker_connected, false), false)],
     ['Emergency stop active', boolLabel(emergencyStop)],
-    ['Requested stop', boolLabel(requestedStop)],
+    ['Requested stop', boolLabel(firstDefined(control.emergencyStopRequested, requestedStop), false)],
     ['Stop source', textOr(firstDefined(control.stopSource, control.stop_source), 'Unknown')],
   ]);
 
@@ -130,7 +132,7 @@ function renderExecutions(container, executions) {
   const wrapper = document.createElement('div');
   wrapper.className = 'execution-summary';
 
-  const summary = latest.summary || latest.message || latest.note || latest.description || 'Latest execution';
+  const summary = latest.summary || latest.message || latest.note || latest.description || latest.reason || 'Latest execution';
   wrapper.appendChild(kvItem('Summary', textOr(summary, 'No recent executions')));
   wrapper.appendChild(kvItem('Status', textOr(latest.status, 'Unknown')));
   wrapper.appendChild(kvItem('Symbol', textOr(latest.symbol ?? latest.ticker, 'Unknown')));
