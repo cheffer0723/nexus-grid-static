@@ -45,11 +45,12 @@ async function refreshState() {
 }
 
 function renderDashboard(data) {
-  const system = pickObject(data, ['system_status', 'systemStatus']);
-  const health = pickObject(data, ['health']);
-  const control = pickObject(data, ['control_state', 'controlState']);
-  const signal = pickObject(data, ['signal_latest', 'signalLatest']);
-  const executions = pickExecutions(data);
+  const payload = data?.data && typeof data.data === 'object' ? data.data : data;
+  const system = pickObject(payload, ['system_status', 'systemStatus']);
+  const health = pickObject(payload, ['health']);
+  const control = pickObject(payload, ['control_state', 'controlState']);
+  const signal = pickObject(payload, ['signal_latest', 'signalLatest']);
+  const executions = pickExecutions(payload);
 
   const tradingAllowed = asBool(firstDefined(
     system.trading_allowed,
@@ -111,7 +112,7 @@ function renderDashboard(data) {
   ]);
 
   renderExecutions(els.executionArea, executions);
-  els.rawState.textContent = safeStringify(data);
+  els.rawState.textContent = safeStringify(payload);
 }
 
 function renderExecutions(container, executions) {
