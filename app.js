@@ -34,7 +34,24 @@ function syncApiBaseUi() {
     pill.textContent = `Mode: ${MODE_CONFIG[DASHBOARD_MODE].label}`;
   }
   if (hint) hint.textContent = API_BASE;
-  if (build) build.textContent = `Build: ${BUILD_COMMIT}`;
+  if (build) build.textContent = `Build: ${localStorage.getItem("NEXUS_BUILD_SHA") || BUILD_COMMIT}`;
+}
+
+async function syncBuildCommit() {
+  const build = document.getElementById("frontendCommitText");
+  if (build) build.textContent = `Build: loading...`;
+  try {
+    const res = await fetch("https://api.github.com/repos/cheffer0723/nexus-grid-static/commits/main", { cache: "no-store", headers: { Accept: "application/vnd.github+json" } });
+    if (!res.ok) return;
+    const data = await res.json();
+    const sha = String(data?.sha || "").slice(0, 7);
+    if (sha) {
+      localStorage.setItem("NEXUS_BUILD_SHA", sha);
+      if (build) build.textContent = `Build: ${sha}`;
+    }
+  } catch {
+    if (build) build.textContent = `Build: ${localStorage.getItem("NEXUS_BUILD_SHA") || BUILD_COMMIT}`;
+  }
 }
 
 function updateApiBase(nextBase) {
@@ -99,6 +116,7 @@ function initBackendControls() {
     });
   }
   syncApiBaseUi();
+  syncBuildCommit().catch(() => {});
 }
 
 const fmt = {
