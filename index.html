@@ -3,65 +3,93 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nexus Grid</title>
-    <meta name="description" content="Static Nexus mission dashboard" />
-    <link rel="stylesheet" href="./style.css" />
-    <script defer src="./app.js"></script>
+    <title>Nexus Observability Dashboard</title>
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <header class="hero card">
-        <div>
-          <p class="eyebrow">Static Mission Dashboard</p>
-          <h1>Nexus Grid</h1>
-          <p class="subtitle">Read-only status snapshot loaded from <code>state.json</code>.</p>
+    <header class="topbar">
+      <div>
+        <h1>Nexus Observability</h1>
+        <p class="subtitle">Read-only monitoring surface for engine state, trades, ML shadow output, and regime performance.</p>
+      </div>
+      <div class="status-pills">
+        <span class="pill" id="engineModePill">Engine: …</span>
+        <span class="pill" id="mlPill">ML: …</span>
+        <span class="pill" id="freshnessPill">Updated: …</span>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="card hero">
+        <div class="card-head">
+          <div>
+            <h2>Current Engine State</h2>
+            <p class="card-note">Latest packet plus system snapshot.</p>
+          </div>
+          <span class="stamp" id="engineSourceStamp">Source: …</span>
         </div>
-        <div class="status-stack">
-          <span id="overallBadge" class="badge badge-neutral">Loading</span>
-          <p class="refresh-meta">
-            Last successful refresh: <strong id="lastRefresh">Never</strong>
-          </p>
+        <div id="engineStateGrid" class="kv-grid"></div>
+      </section>
+
+      <section class="card wide">
+        <div class="card-head">
+          <div>
+            <h2>Process Control</h2>
+            <p class="card-note">Start, stop, and restart the local Nexus services.</p>
+          </div>
+          <span class="stamp" id="processCountStamp">—</span>
         </div>
-      </header>
+        <div id="processCards" class="process-grid"></div>
+      </section>
 
-      <section id="errorBanner" class="banner banner-error" hidden></section>
-
-      <section class="grid">
-        <article class="card">
-          <div class="card-head">
-            <h2>Mission Control</h2>
+      <section class="card wide">
+        <div class="card-head">
+          <div>
+            <h2>Recent Trades</h2>
+            <p class="card-note">Closed positions from the paper execution history.</p>
           </div>
-          <dl class="kv-list" id="missionControlList"></dl>
-        </article>
+          <span class="stamp" id="tradeCountStamp">—</span>
+        </div>
+        <div class="table-wrap" id="recentTradesWrap"></div>
+      </section>
 
-        <article class="card">
-          <div class="card-head">
-            <h2>Engine Status</h2>
+      <section class="card wide">
+        <div class="card-head">
+          <div>
+            <h2>ML Disagreement Monitor</h2>
+            <p class="card-note">Rows where deterministic and ML shadow regimes differ.</p>
           </div>
-          <dl class="kv-list" id="engineStatusList"></dl>
-        </article>
+          <span class="stamp" id="disagreementCountStamp">—</span>
+        </div>
+        <div class="table-wrap" id="disagreementWrap"></div>
+      </section>
 
-        <article class="card">
-          <div class="card-head">
-            <h2>Signal</h2>
+      <section class="card wide">
+        <div class="card-head">
+          <div>
+            <h2>Regime Performance Summary</h2>
+            <p class="card-note">Grouped by deterministic regime and ML regime.</p>
           </div>
-          <dl class="kv-list" id="signalList"></dl>
-        </article>
-
-        <article class="card wide-card">
-          <div class="card-head">
-            <h2>Execution</h2>
+          <span class="stamp" id="summaryMetaStamp">—</span>
+        </div>
+        <div class="summary-grid">
+          <div>
+            <h3>Deterministic regime</h3>
+            <div class="table-wrap" id="deterministicSummaryWrap"></div>
           </div>
-          <div id="executionArea" class="execution-area"></div>
-        </article>
-
-        <article class="card wide-card">
-          <div class="card-head">
-            <h2>Raw State</h2>
+          <div>
+            <h3>ML regime</h3>
+            <div class="table-wrap" id="mlSummaryWrap"></div>
           </div>
-          <pre id="rawState" class="raw-state">Loading state...</pre>
-        </article>
+        </div>
       </section>
     </main>
+
+    <footer class="footer">
+      <span id="dashboardUpdated">Last updated: —</span>
+      <span id="dashboardSource">Source: —</span>
+    </footer>
+
+    <script src="/app.js"></script>
   </body>
 </html>
