@@ -10,7 +10,7 @@
     <header class="topbar">
       <div>
         <h1>Nexus Observability</h1>
-        <p class="subtitle">Read-only monitoring surface for engine state, trades, ML shadow output, and regime performance.</p>
+        <p class="subtitle">Monitoring surface for engine state, trades, ML shadow output, regime performance, and local process control.</p>
       </div>
       <div class="status-pills">
         <span class="pill" id="engineModePill">Engine: …</span>
@@ -29,6 +29,22 @@
           <span class="stamp" id="engineSourceStamp">Source: …</span>
         </div>
         <div id="engineStateGrid" class="kv-grid"></div>
+      </section>
+
+      <section class="card wide">
+        <div class="card-head">
+          <div>
+            <h2>Backend API</h2>
+            <p class="card-note">Buttons call this base URL, saved in your browser.</p>
+          </div>
+          <span class="pill neutral" id="backendStatusPill">Backend: unknown</span>
+        </div>
+        <div class="backend-row">
+          <label class="backend-label" for="apiBaseInput">API base</label>
+          <input id="apiBaseInput" class="backend-input" type="text" spellcheck="false" />
+          <button id="saveApiBaseButton" class="backend-button" type="button">Save</button>
+        </div>
+        <div class="backend-hint mono" id="backendBaseText"></div>
       </section>
 
       <section class="card wide">

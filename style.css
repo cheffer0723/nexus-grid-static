@@ -225,6 +225,51 @@ tbody tr:hover {
   gap: 14px;
 }
 
+.backend-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 160px) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.backend-label {
+  color: var(--muted);
+  font-size: 0.88rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.backend-input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.backend-button {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.backend-button:hover {
+  border-color: rgba(86, 182, 255, 0.5);
+}
+
+.backend-hint {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
 .process-card {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 16px;

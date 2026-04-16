@@ -1,5 +1,4 @@
-const API_BASE = window.NEXUS_API_BASE || localStorage.getItem("NEXUS_API_BASE") || "http://127.0.0.1:8080";
-const DASHBOARD_ENDPOINT = `${API_BASE}/api/nexus/dashboard`;
+let API_BASE = window.NEXUS_API_BASE || localStorage.getItem("NEXUS_API_BASE") || "http://127.0.0.1:8080";
 const REFRESH_MS = 45000;
 const PROCESS_REFRESH_MS = 5000;
 const DEFAULT_PROCESS_SERVICES = [
@@ -8,6 +7,57 @@ const DEFAULT_PROCESS_SERVICES = [
   { key: "outcomes_tracker", label: "Outcomes tracker" },
   { key: "morning_bias", label: "Morning bias loop" },
 ];
+
+function normalizeApiBase(value) {
+  return String(value ?? "").trim().replace(/\/$/, "");
+}
+
+function syncApiBaseUi() {
+  const input = document.getElementById("apiBaseInput");
+  const pill = document.getElementById("backendStatusPill");
+  const hint = document.getElementById("backendBaseText");
+  if (input) input.value = API_BASE;
+  if (pill) {
+    pill.className = "pill neutral";
+    pill.textContent = `Backend: ${API_BASE}`;
+  }
+  if (hint) hint.textContent = API_BASE;
+}
+
+function updateApiBase(nextBase) {
+  const normalized = normalizeApiBase(nextBase);
+  if (!normalized) return false;
+  API_BASE = normalized;
+  localStorage.setItem("NEXUS_API_BASE", API_BASE);
+  syncApiBaseUi();
+  return true;
+}
+
+function dashboardEndpoint() {
+  return `${API_BASE}/api/nexus/dashboard`;
+}
+
+function initBackendControls() {
+  const input = document.getElementById("apiBaseInput");
+  const saveButton = document.getElementById("saveApiBaseButton");
+  if (input) input.value = API_BASE;
+  if (saveButton) {
+    saveButton.addEventListener("click", async () => {
+      if (!updateApiBase(input?.value)) return;
+      await refreshDashboard();
+    });
+  }
+  if (input) {
+    input.addEventListener("keydown", async (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        if (!updateApiBase(input.value)) return;
+        await refreshDashboard();
+      }
+    });
+  }
+  syncApiBaseUi();
+}
 
 const fmt = {
   int(value) {
@@ -337,7 +387,7 @@ function renderDashboard(payload) {
 }
 
 async function loadDashboard() {
-  const res = await fetch(DASHBOARD_ENDPOINT, { cache: "no-store" });
+  const res = await fetch(dashboardEndpoint(), { cache: "no-store" });
   if (!res.ok) {
     throw new Error(`Dashboard fetch failed: ${res.status}`);
   }
@@ -367,6 +417,8 @@ async function refreshDashboard() {
     if (footer) footer.textContent = "Last updated: unavailable";
   }
 }
+
+initBackendControls();
 
 renderProcessCards({ services: DEFAULT_PROCESS_SERVICES.map((service) => ({
   ...service,
