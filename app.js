@@ -2,6 +2,12 @@ const API_BASE = window.NEXUS_API_BASE || localStorage.getItem("NEXUS_API_BASE")
 const DASHBOARD_ENDPOINT = `${API_BASE}/api/nexus/dashboard`;
 const REFRESH_MS = 45000;
 const PROCESS_REFRESH_MS = 5000;
+const DEFAULT_PROCESS_SERVICES = [
+  { key: "engine", label: "Nexus engine" },
+  { key: "bridge", label: "Bridge" },
+  { key: "outcomes_tracker", label: "Outcomes tracker" },
+  { key: "morning_bias", label: "Morning bias loop" },
+];
 
 const fmt = {
   int(value) {
@@ -148,7 +154,7 @@ async function processAction(service, action) {
 }
 
 function renderProcessCards(payload) {
-  const services = payload.services || [];
+  const services = payload.services && payload.services.length ? payload.services : DEFAULT_PROCESS_SERVICES;
   setText("processCountStamp", `${services.length} managed services`);
 
   const container = document.getElementById("processCards");
@@ -361,6 +367,25 @@ async function refreshDashboard() {
     if (footer) footer.textContent = "Last updated: unavailable";
   }
 }
+
+renderProcessCards({ services: DEFAULT_PROCESS_SERVICES.map((service) => ({
+  ...service,
+  status: "stopped",
+  pid: null,
+  start_time_utc: null,
+  stop_time_utc: null,
+  exit_code: null,
+  last_error: null,
+  last_output_at_utc: null,
+  last_file_update_at_utc: null,
+  last_heartbeat_at_utc: null,
+  last_stdout_tail: [],
+  last_stderr_tail: [],
+  script_path: null,
+  command_display: null,
+  launch_command: null,
+  monitored_paths: [],
+})) });
 
 refreshDashboard();
 setInterval(refreshDashboard, REFRESH_MS);
