@@ -1,4 +1,13 @@
-let API_BASE = window.NEXUS_API_BASE || localStorage.getItem("NEXUS_API_BASE") || "http://127.0.0.1:8080";
+const DEFAULT_MODE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "local" : "remote";
+const MODE_STORAGE_KEY = "NEXUS_DASHBOARD_MODE";
+const BUILD_COMMIT = document.currentScript?.dataset.commit || localStorage.getItem("NEXUS_BUILD_SHA") || "unknown";
+const MODE_CONFIG = {
+  remote: { label: "Remote, read-only", apiBase: "https://critical-mass-lab-production.up.railway.app" },
+  local: { label: "Local, control enabled", apiBase: "http://127.0.0.1:8080" },
+};
+let DASHBOARD_MODE = localStorage.getItem(MODE_STORAGE_KEY) || DEFAULT_MODE;
+if (!MODE_CONFIG[DASHBOARD_MODE]) DASHBOARD_MODE = DEFAULT_MODE;
+let API_BASE = MODE_CONFIG[DASHBOARD_MODE].apiBase;
 const REFRESH_MS = 45000;
 const PROCESS_REFRESH_MS = 5000;
 const DEFAULT_PROCESS_SERVICES = [
@@ -14,14 +23,18 @@ function normalizeApiBase(value) {
 
 function syncApiBaseUi() {
   const input = document.getElementById("apiBaseInput");
+  const modeSelect = document.getElementById("modeSelect");
   const pill = document.getElementById("backendStatusPill");
   const hint = document.getElementById("backendBaseText");
+  const build = document.getElementById("frontendCommitText");
   if (input) input.value = API_BASE;
+  if (modeSelect) modeSelect.value = DASHBOARD_MODE;
   if (pill) {
-    pill.className = "pill neutral";
-    pill.textContent = `Backend: ${API_BASE}`;
+    pill.className = `pill ${DASHBOARD_MODE === "local" ? "ok" : "warn"}`;
+    pill.textContent = `Mode: ${MODE_CONFIG[DASHBOARD_MODE].label}`;
   }
   if (hint) hint.textContent = API_BASE;
+  if (build) build.textContent = `Build: ${BUILD_COMMIT}`;
 }
 
 function updateApiBase(nextBase) {
@@ -33,14 +46,43 @@ function updateApiBase(nextBase) {
   return true;
 }
 
+function setMode(nextMode) {
+  const normalized = nextMode === "local" ? "local" : "remote";
+  DASHBOARD_MODE = normalized;
+  API_BASE = MODE_CONFIG[DASHBOARD_MODE].apiBase;
+  localStorage.setItem(MODE_STORAGE_KEY, DASHBOARD_MODE);
+  localStorage.setItem("NEXUS_API_BASE", API_BASE);
+  syncApiBaseUi();
+}
+
 function dashboardEndpoint() {
-  return `${API_BASE}/api/nexus/dashboard`;
+  return DASHBOARD_MODE === "remote" ? `${API_BASE}/state` : `${API_BASE}/api/nexus/dashboard`;
+}
+
+function buildRemoteDashboardPayload(raw) {
+  const data = raw?.data && typeof raw.data === "object" ? raw.data : raw;
+  return {
+    generated_at_utc: raw?.received_at_utc || raw?.generated_at_utc || new Date().toISOString(),
+    engine_state: data || {},
+    recent_trades: [],
+    disagreements: [],
+    regime_summary: { deterministic: [], ml: [], meta: { trade_count: 0 } },
+    processes: [],
+  };
 }
 
 function initBackendControls() {
   const input = document.getElementById("apiBaseInput");
+  const modeSelect = document.getElementById("modeSelect");
   const saveButton = document.getElementById("saveApiBaseButton");
   if (input) input.value = API_BASE;
+  if (modeSelect) modeSelect.value = DASHBOARD_MODE;
+  if (modeSelect) {
+    modeSelect.addEventListener("change", async () => {
+      setMode(modeSelect.value);
+      await refreshDashboard();
+    });
+  }
   if (saveButton) {
     saveButton.addEventListener("click", async () => {
       if (!updateApiBase(input?.value)) return;
@@ -192,6 +234,10 @@ function commandText(value) {
 }
 
 async function processAction(service, action) {
+  if (DASHBOARD_MODE !== "local") {
+    setText("lastErrorText", "Process control is disabled in remote mode.");
+    return;
+  }
   const res = await fetch(`${API_BASE}/api/processes/${encodeURIComponent(service)}/${action}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -205,7 +251,8 @@ async function processAction(service, action) {
 
 function renderProcessCards(payload) {
   const services = payload.services && payload.services.length ? payload.services : DEFAULT_PROCESS_SERVICES;
-  setText("processCountStamp", `${services.length} managed services`);
+  const localMode = DASHBOARD_MODE === "local";
+  setText("processCountStamp", localMode ? `${services.length} managed services` : `Remote mode, process control disabled`);
 
   const container = document.getElementById("processCards");
   if (!container) return;
@@ -226,8 +273,8 @@ function renderProcessCards(payload) {
       const scriptPath = fmt.text(service.script_path);
       const launchCommand = commandText(service.launch_command);
       const monitoredPaths = (service.monitored_paths || []).map((p) => `<div class="mono">${escapeHtml(fmt.text(p))}</div>`).join("");
-      const stopDisabled = status !== "running" && status !== "starting" && status !== "stopping";
-      const startDisabled = status === "running" || status === "starting";
+      const stopDisabled = !localMode || (status !== "running" && status !== "starting" && status !== "stopping");
+      const startDisabled = !localMode || status === "running" || status === "starting";
       return `
         <div class="process-card status-${escapeHtml(status)}">
           <div class="process-card-header">
@@ -255,6 +302,7 @@ function renderProcessCards(payload) {
           <div class="process-command"><span class="kv-label">Exact script path</span><div class="mono">${escapeHtml(scriptPath)}</div></div>
           <div class="process-command"><span class="kv-label">Command executed inside runner</span><div class="mono">${escapeHtml(commandDisplay)}</div></div>
           <div class="process-paths"><span class="kv-label">Monitored live files</span>${monitoredPaths || "<div class='empty-state'>No monitored files configured.</div>"}</div>
+          ${localMode ? "" : "<div class='empty-state'>Remote mode is read-only. Switch to local mode on a desktop on the host machine to use process controls.</div>"}
           <div class="process-tail"><span class="kv-label">Recent output</span><pre>${escapeHtml(combinedTail || "No output yet.")}</pre></div>
         </div>
       `;
@@ -263,6 +311,27 @@ function renderProcessCards(payload) {
 }
 
 async function loadProcesses() {
+  if (DASHBOARD_MODE !== "local") {
+    renderProcessCards({ services: DEFAULT_PROCESS_SERVICES.map((service) => ({
+      ...service,
+      status: "stopped",
+      pid: null,
+      start_time_utc: null,
+      stop_time_utc: null,
+      exit_code: null,
+      last_error: null,
+      last_output_at_utc: null,
+      last_file_update_at_utc: null,
+      last_heartbeat_at_utc: null,
+      last_stdout_tail: [],
+      last_stderr_tail: [],
+      script_path: null,
+      command_display: null,
+      launch_command: null,
+      monitored_paths: [],
+    })) });
+    return { ok: true, mode: "remote" };
+  }
   const res = await fetch(`${API_BASE}/api/processes`, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(`Process fetch failed: ${res.status}`);
@@ -391,17 +460,22 @@ async function loadDashboard() {
   if (!res.ok) {
     throw new Error(`Dashboard fetch failed: ${res.status}`);
   }
-  const payload = await res.json();
+  const raw = await res.json();
+  const payload = DASHBOARD_MODE === "remote" ? buildRemoteDashboardPayload(raw) : raw;
   renderDashboard(payload);
+  return payload;
 }
 
 async function refreshDashboard() {
   let ok = true;
+  const now = new Date();
   try {
     await loadDashboard();
   } catch (error) {
     ok = false;
     console.error(error);
+    const lastError = document.getElementById("lastErrorText");
+    if (lastError) lastError.textContent = `Last error: ${error.message}`;
   }
 
   try {
@@ -409,9 +483,15 @@ async function refreshDashboard() {
   } catch (error) {
     ok = false;
     console.error(error);
+    const lastError = document.getElementById("lastErrorText");
+    if (lastError) lastError.textContent = `Last error: ${error.message}`;
   }
 
   document.body.dataset.status = ok ? "ok" : "error";
+  const successText = document.getElementById("lastSuccessText");
+  const reachabilityText = document.getElementById("backendReachabilityText");
+  if (successText && ok) successText.textContent = `Last successful fetch: ${now.toLocaleString()}`;
+  if (reachabilityText) reachabilityText.textContent = `Backend reachable: ${ok ? "yes" : "no"}`;
   if (!ok) {
     const footer = document.getElementById("dashboardUpdated");
     if (footer) footer.textContent = "Last updated: unavailable";
