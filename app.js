@@ -460,30 +460,36 @@ function renderEngineState(payload) {
   const paper = state.paper_summary || {};
   const signal = state.signal_latest || {};
 
-  const engineMode = system.mode || state.market_bias || signal.market_bias || "unknown";
+  const marketBias = signal.market_bias ?? signal.marketBias ?? state.market_bias ?? state.marketBias ?? "unknown";
+  const volatilityState = signal.volatility_state ?? signal.volatilityState ?? state.volatility_state ?? state.volatilityState ?? "unknown";
+  const deterministicRegime = signal.deterministic_regime ?? signal.deterministicRegime ?? "unknown";
+  const shadowEodOnly = signal.shadow_eod_only ?? signal.shadowEodOnly ?? false;
+  const confidenceAdjusted = signal.confidence_adjusted ?? signal.confidenceAdjusted ?? signal.confidence;
+  const currentPrice = signal.current_price ?? signal.currentPrice ?? state.current_price ?? state.currentPrice;
   const mlMatch = signal.ml_vs_deterministic_match;
+  const engineMode = system.mode || marketBias || "unknown";
   const mlState = signal.ml_regime_pred ? `${signal.ml_regime_pred} (${fmt.pct(signal.ml_regime_confidence)})` : "unavailable";
 
   setBadge("engineModePill", "Engine", engineMode);
-  setBadge("mlPill", "ML", mlMatch === false ? "mismatch" : mlMatch === true ? "match" : signal.shadow_eod_only ? "shadow" : "unknown");
+  setBadge("mlPill", "ML", mlMatch === false ? "mismatch" : mlMatch === true ? "match" : shadowEodOnly ? "shadow" : "unknown");
   setText("freshnessPill", `Updated: ${fmt.text(payload.generated_at_utc)}`);
   setText("dashboardUpdated", `Last updated: ${fmt.text(payload.generated_at_utc)}`);
   setText("dashboardSource", `Source: ${fmt.text(state.source_file)}`);
   setText("engineSourceStamp", `Source: ${fmt.text(state.source_mtime_utc || state.source_file)}`);
 
   const entries = [
-    { label: "timestamp", value: fmt.text(signal.timestamp_utc), className: "mono" },
+    { label: "timestamp", value: fmt.text(signal.timestamp_utc ?? signal.timestamp), className: "mono" },
     { label: "symbol", value: fmt.text(signal.symbol), className: "mono" },
     { label: "action", value: fmt.text(signal.action), className: actionClass(signal.action) },
-    { label: "market bias", value: fmt.text(signal.market_bias), className: actionClass(signal.market_bias) },
-    { label: "deterministic regime", value: fmt.text(signal.deterministic_regime), className: actionClass(signal.deterministic_regime) },
+    { label: "market bias", value: fmt.text(marketBias), className: actionClass(marketBias) },
+    { label: "deterministic regime", value: fmt.text(deterministicRegime), className: actionClass(deterministicRegime) },
     { label: "ML shadow regime", value: fmt.text(signal.ml_regime_pred), className: actionClass(signal.ml_regime_pred) },
     { label: "ML confidence", value: fmt.pct(signal.ml_regime_confidence), className: "mono" },
     { label: "ML vs deterministic", value: fmt.text(signal.ml_vs_deterministic_match === null || signal.ml_vs_deterministic_match === undefined ? "unknown" : signal.ml_vs_deterministic_match ? "match" : "mismatch"), className: badgeClass(signal.ml_vs_deterministic_match) },
-    { label: "shadow_eod_only", value: fmt.text(signal.shadow_eod_only), className: badgeClass(signal.shadow_eod_only) },
+    { label: "shadow_eod_only", value: fmt.text(shadowEodOnly), className: badgeClass(shadowEodOnly) },
     { label: "confidence", value: fmt.num(signal.confidence, 2), className: "mono" },
-    { label: "current price", value: fmt.price(signal.current_price), className: "mono" },
-    { label: "confidence adjusted", value: fmt.num(signal.confidence_adjusted, 2), className: "mono" },
+    { label: "current price", value: fmt.price(currentPrice), className: "mono" },
+    { label: "confidence adjusted", value: fmt.num(confidenceAdjusted, 2), className: "mono" },
     { label: "broker connected", value: fmt.text(system.brokerConnected), className: badgeClass(system.brokerConnected) },
     { label: "engine running", value: fmt.text(system.running), className: badgeClass(system.running) },
     { label: "mode", value: fmt.text(system.mode), className: actionClass(system.mode) },
