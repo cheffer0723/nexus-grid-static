@@ -42,7 +42,8 @@
         <div class="backend-row">
           <label class="backend-label" for="modeSelect">Mode</label>
           <select id="modeSelect" class="backend-input">
-            <option value="remote">Remote, read-only</option>
+            <option value="remote">Remote, read-only (Railway)</option>
+            <option value="remoteControl">Remote control (DO or other backend)</option>
             <option value="local">Local, control enabled</option>
           </select>
           <span class="backend-button" id="frontendCommitText">Build: unknown</span>
@@ -51,6 +52,11 @@
           <label class="backend-label" for="apiBaseInput">API base</label>
           <input id="apiBaseInput" class="backend-input" type="text" spellcheck="false" />
           <button id="saveApiBaseButton" class="backend-button" type="button">Save</button>
+        </div>
+        <div class="backend-row">
+          <label class="backend-label" for="controlTokenInput">Control token</label>
+          <input id="controlTokenInput" class="backend-input" type="password" spellcheck="false" />
+          <button id="saveControlTokenButton" class="backend-button" type="button">Save</button>
         </div>
         <div class="backend-hint mono" id="backendBaseText"></div>
         <div class="backend-hint" id="backendReachabilityText"></div>

@@ -1,8 +1,9 @@
-const DEFAULT_MODE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "local" : "remote";
+const DEFAULT_MODE = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "local" : "remoteControl";
 const MODE_STORAGE_KEY = "NEXUS_DASHBOARD_MODE";
 const BUILD_COMMIT = document.currentScript?.dataset.commit || localStorage.getItem("NEXUS_BUILD_SHA") || "unknown";
 const MODE_CONFIG = {
-  remote: { label: "Remote, read-only", apiBase: "https://critical-mass-lab-production.up.railway.app" },
+  remote: { label: "Remote, read-only (Railway)", apiBase: "https://critical-mass-lab-production.up.railway.app" },
+  remoteControl: { label: "Remote control", apiBase: localStorage.getItem("NEXUS_REMOTE_CONTROL_BASE") || "http://165.227.84.11:8896" },
   local: { label: "Local, control enabled", apiBase: "http://127.0.0.1:8080" },
 };
 let DASHBOARD_MODE = localStorage.getItem(MODE_STORAGE_KEY) || DEFAULT_MODE;
@@ -21,16 +22,25 @@ function normalizeApiBase(value) {
   return String(value ?? "").trim().replace(/\/$/, "");
 }
 
+function apiBaseKeyForMode(mode) {
+  if (mode === "remoteControl") return "NEXUS_REMOTE_CONTROL_BASE";
+  if (mode === "local") return "NEXUS_LOCAL_API_BASE";
+  return "NEXUS_REMOTE_READONLY_BASE";
+}
+
 function syncApiBaseUi() {
   const input = document.getElementById("apiBaseInput");
   const modeSelect = document.getElementById("modeSelect");
+  const tokenInput = document.getElementById("controlTokenInput");
   const pill = document.getElementById("backendStatusPill");
   const hint = document.getElementById("backendBaseText");
   const build = document.getElementById("frontendCommitText");
   if (input) input.value = API_BASE;
   if (modeSelect) modeSelect.value = DASHBOARD_MODE;
+  if (tokenInput) tokenInput.value = localStorage.getItem("NEXUS_CONTROL_TOKEN") || "";
   if (pill) {
-    pill.className = `pill ${DASHBOARD_MODE === "local" ? "ok" : "warn"}`;
+    const className = DASHBOARD_MODE === "remoteControl" || DASHBOARD_MODE === "local" ? "ok" : "warn";
+    pill.className = `pill ${className}`;
     pill.textContent = `Mode: ${MODE_CONFIG[DASHBOARD_MODE].label}`;
   }
   if (hint) hint.textContent = API_BASE;
@@ -58,22 +68,31 @@ function updateApiBase(nextBase) {
   const normalized = normalizeApiBase(nextBase);
   if (!normalized) return false;
   API_BASE = normalized;
-  localStorage.setItem("NEXUS_API_BASE", API_BASE);
+  localStorage.setItem(apiBaseKeyForMode(DASHBOARD_MODE), API_BASE);
+  syncApiBaseUi();
+  return true;
+}
+
+function updateControlToken(nextToken) {
+  const token = String(nextToken ?? "").trim();
+  if (!token) return false;
+  localStorage.setItem("NEXUS_CONTROL_TOKEN", token);
   syncApiBaseUi();
   return true;
 }
 
 function setMode(nextMode) {
-  const normalized = nextMode === "local" ? "local" : "remote";
+  const normalized = nextMode === "local" || nextMode === "remoteControl" ? nextMode : "remote";
   DASHBOARD_MODE = normalized;
-  API_BASE = MODE_CONFIG[DASHBOARD_MODE].apiBase;
+  API_BASE = MODE_CONFIG[DASHBOARD_MODE].apiBase || localStorage.getItem(apiBaseKeyForMode(DASHBOARD_MODE)) || "";
   localStorage.setItem(MODE_STORAGE_KEY, DASHBOARD_MODE);
-  localStorage.setItem("NEXUS_API_BASE", API_BASE);
   syncApiBaseUi();
 }
 
 function dashboardEndpoint() {
-  return DASHBOARD_MODE === "remote" ? `${API_BASE}/state` : `${API_BASE}/api/nexus/dashboard`;
+  if (DASHBOARD_MODE === "remote") return `${API_BASE}/state`;
+  if (DASHBOARD_MODE === "remoteControl") return `${API_BASE}/api/remote/state`;
+  return `${API_BASE}/api/nexus/dashboard`;
 }
 
 function buildRemoteDashboardPayload(raw) {
@@ -91,7 +110,9 @@ function buildRemoteDashboardPayload(raw) {
 function initBackendControls() {
   const input = document.getElementById("apiBaseInput");
   const modeSelect = document.getElementById("modeSelect");
+  const tokenInput = document.getElementById("controlTokenInput");
   const saveButton = document.getElementById("saveApiBaseButton");
+  const saveTokenButton = document.getElementById("saveControlTokenButton");
   if (input) input.value = API_BASE;
   if (modeSelect) modeSelect.value = DASHBOARD_MODE;
   if (modeSelect) {
@@ -106,11 +127,26 @@ function initBackendControls() {
       await refreshDashboard();
     });
   }
+  if (saveTokenButton) {
+    saveTokenButton.addEventListener("click", async () => {
+      if (!updateControlToken(tokenInput?.value)) return;
+      await refreshDashboard();
+    });
+  }
   if (input) {
     input.addEventListener("keydown", async (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
         if (!updateApiBase(input.value)) return;
+        await refreshDashboard();
+      }
+    });
+  }
+  if (tokenInput) {
+    tokenInput.addEventListener("keydown", async (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        if (!updateControlToken(tokenInput.value)) return;
         await refreshDashboard();
       }
     });
@@ -252,13 +288,23 @@ function commandText(value) {
 }
 
 async function processAction(service, action) {
-  if (DASHBOARD_MODE !== "local") {
-    setText("lastErrorText", "Process control is disabled in remote mode.");
+  if (DASHBOARD_MODE === "remote") {
+    setText("lastErrorText", "Process control is disabled in read-only remote mode.");
     return;
   }
-  const res = await fetch(`${API_BASE}/api/processes/${encodeURIComponent(service)}/${action}`, {
+  const headers = { "Content-Type": "application/json" };
+  const token = localStorage.getItem("NEXUS_CONTROL_TOKEN") || "";
+  if (DASHBOARD_MODE === "remoteControl" && token) headers["x-nexus-remote-token"] = token;
+  const targetUrl = DASHBOARD_MODE === "remoteControl"
+    ? `${API_BASE}/api/remote/commands`
+    : `${API_BASE}/api/processes/${encodeURIComponent(service)}/${action}`;
+  const body = DASHBOARD_MODE === "remoteControl"
+    ? JSON.stringify({ service, action, requested_by: "dashboard", source: "nexus-grid-static" })
+    : undefined;
+  const res = await fetch(targetUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
+    body,
     cache: "no-store",
   });
   if (!res.ok) {
@@ -269,8 +315,9 @@ async function processAction(service, action) {
 
 function renderProcessCards(payload) {
   const services = payload.services && payload.services.length ? payload.services : DEFAULT_PROCESS_SERVICES;
-  const localMode = DASHBOARD_MODE === "local";
-  setText("processCountStamp", localMode ? `${services.length} managed services` : `Remote mode, process control disabled`);
+  const controlMode = DASHBOARD_MODE === "local" || DASHBOARD_MODE === "remoteControl";
+  const remoteControlMode = DASHBOARD_MODE === "remoteControl";
+  setText("processCountStamp", controlMode ? `${services.length} managed services` : `Remote mode, process control disabled`);
 
   const container = document.getElementById("processCards");
   if (!container) return;
@@ -291,8 +338,8 @@ function renderProcessCards(payload) {
       const scriptPath = fmt.text(service.script_path);
       const launchCommand = commandText(service.launch_command);
       const monitoredPaths = (service.monitored_paths || []).map((p) => `<div class="mono">${escapeHtml(fmt.text(p))}</div>`).join("");
-      const stopDisabled = !localMode || (status !== "running" && status !== "starting" && status !== "stopping");
-      const startDisabled = !localMode || status === "running" || status === "starting";
+      const stopDisabled = !controlMode || (status !== "running" && status !== "starting" && status !== "stopping");
+      const startDisabled = !controlMode || status === "running" || status === "starting";
       return `
         <div class="process-card status-${escapeHtml(status)}">
           <div class="process-card-header">
@@ -320,7 +367,7 @@ function renderProcessCards(payload) {
           <div class="process-command"><span class="kv-label">Exact script path</span><div class="mono">${escapeHtml(scriptPath)}</div></div>
           <div class="process-command"><span class="kv-label">Command executed inside runner</span><div class="mono">${escapeHtml(commandDisplay)}</div></div>
           <div class="process-paths"><span class="kv-label">Monitored live files</span>${monitoredPaths || "<div class='empty-state'>No monitored files configured.</div>"}</div>
-          ${localMode ? "" : "<div class='empty-state'>Remote mode is read-only. Switch to local mode on a desktop on the host machine to use process controls.</div>"}
+          ${controlMode ? "" : "<div class='empty-state'>Remote mode is read-only. Switch to local mode on a desktop on the host machine to use process controls.</div>"}
           <div class="process-tail"><span class="kv-label">Recent output</span><pre>${escapeHtml(combinedTail || "No output yet.")}</pre></div>
         </div>
       `;
@@ -329,6 +376,39 @@ function renderProcessCards(payload) {
 }
 
 async function loadProcesses() {
+  if (DASHBOARD_MODE === "remoteControl") {
+    const res = await fetch(`${API_BASE}/api/remote/state`, {
+      cache: "no-store",
+      headers: localStorage.getItem("NEXUS_CONTROL_TOKEN") ? { "x-nexus-remote-token": localStorage.getItem("NEXUS_CONTROL_TOKEN") } : {},
+    });
+    if (!res.ok) throw new Error(`Remote command state fetch failed: ${res.status}`);
+    const raw = await res.json();
+    const services = (raw.services || []).map((row) => {
+      let statusData = {};
+      try { statusData = JSON.parse(row.status_json || "{}"); } catch { statusData = {}; }
+      return {
+        key: row.service,
+        label: row.service,
+        status: statusData.status || "unknown",
+        pid: statusData.pid ?? null,
+        start_time_utc: statusData.start_time_utc || null,
+        stop_time_utc: statusData.stop_time_utc || null,
+        exit_code: statusData.exit_code ?? null,
+        last_error: statusData.last_error || row.last_error || null,
+        last_output_at_utc: statusData.last_output_at_utc || null,
+        last_file_update_at_utc: statusData.last_file_update_at_utc || null,
+        last_heartbeat_at_utc: statusData.last_heartbeat_at_utc || row.last_heartbeat_at_utc || null,
+        last_stdout_tail: [],
+        last_stderr_tail: [],
+        script_path: null,
+        command_display: null,
+        launch_command: null,
+        monitored_paths: [],
+      };
+    });
+    renderProcessCards({ services });
+    return { ok: true, mode: "remoteControl" };
+  }
   if (DASHBOARD_MODE !== "local") {
     renderProcessCards({ services: DEFAULT_PROCESS_SERVICES.map((service) => ({
       ...service,
@@ -479,7 +559,7 @@ async function loadDashboard() {
     throw new Error(`Dashboard fetch failed: ${res.status}`);
   }
   const raw = await res.json();
-  const payload = DASHBOARD_MODE === "remote" ? buildRemoteDashboardPayload(raw) : raw;
+  const payload = (DASHBOARD_MODE === "remote" || DASHBOARD_MODE === "remoteControl") ? buildRemoteDashboardPayload(raw) : raw;
   renderDashboard(payload);
   return payload;
 }
