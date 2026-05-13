@@ -64,6 +64,26 @@
         <div class="backend-hint" id="lastErrorText"></div>
       </section>
 
+
+      <section class="card wide incident-card" id="deploymentIncidentCard" hidden>
+        <div class="card-head">
+          <div>
+            <h2>Deployment Incident</h2>
+            <p class="card-note">Recent production job status for the static GitHub information view.</p>
+          </div>
+          <span class="pill bad" id="deploymentIncidentStatus">Status: —</span>
+        </div>
+        <div class="incident-grid">
+          <div class="incident-summary">
+            <h3 id="deploymentIncidentTitle">—</h3>
+            <p id="deploymentIncidentSummary">—</p>
+          </div>
+          <div class="incident-meta kv-grid" id="deploymentIncidentMeta"></div>
+        </div>
+        <div class="incident-actions" id="deploymentIncidentActions"></div>
+        <pre class="incident-log mono" id="deploymentIncidentLog"></pre>
+      </section>
+
       <section class="card wide">
         <div class="card-head">
           <div>
