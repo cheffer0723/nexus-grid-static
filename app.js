@@ -98,14 +98,45 @@ function dashboardEndpoint() {
 
 function buildRemoteDashboardPayload(raw) {
   const data = raw?.data && typeof raw.data === "object" ? raw.data : raw;
-  return {
-    generated_at_utc: raw?.received_at_utc || raw?.generated_at_utc || new Date().toISOString(),
+  return normalizeDashboardPayload({
+    generated_at_utc: raw?.received_at_utc || raw?.generated_at_utc,
     engine_state: data || {},
-    recent_trades: [],
-    disagreements: [],
-    regime_summary: { deterministic: [], ml: [], meta: { trade_count: 0 } },
-    processes: [],
+    recent_trades: raw?.recent_trades || [],
+    disagreements: raw?.disagreements || [],
+    regime_summary: raw?.regime_summary || { deterministic: [], ml: [], meta: { trade_count: 0 } },
+    processes: raw?.processes || [],
+    deployment_incident: raw?.deployment_incident || data?.deployment_incident,
+  });
+}
+
+function normalizeDashboardPayload(raw) {
+  if (raw?.engine_state) {
+    return {
+      generated_at_utc: raw.generated_at_utc || raw.generated_at || new Date().toISOString(),
+      engine_state: raw.engine_state || {},
+      recent_trades: raw.recent_trades || raw.executions_recent || [],
+      disagreements: raw.disagreements || [],
+      regime_summary: raw.regime_summary || { deterministic: [], ml: [], meta: { trade_count: raw.recent_trades?.length || 0 } },
+      processes: raw.processes || [],
+      deployment_incident: raw.deployment_incident || raw.engine_state?.deployment_incident || null,
+    };
+  }
+
+  return {
+    generated_at_utc: raw?.generated_at_utc || raw?.generated_at || new Date().toISOString(),
+    engine_state: raw || {},
+    recent_trades: raw?.recent_trades || raw?.executions_recent || [],
+    disagreements: raw?.disagreements || [],
+    regime_summary: raw?.regime_summary || { deterministic: [], ml: [], meta: { trade_count: raw?.executions_recent?.length || 0 } },
+    processes: raw?.processes || [],
+    deployment_incident: raw?.deployment_incident || null,
   };
+}
+
+async function loadBundledDashboardState() {
+  const res = await fetch("./state.json", { cache: "no-store" });
+  if (!res.ok) throw new Error(`Static state fetch failed: ${res.status}`);
+  return normalizeDashboardPayload(await res.json());
 }
 
 function initBackendControls() {
@@ -503,7 +534,53 @@ function renderEngineState(payload) {
   renderKeyValues(document.getElementById("engineStateGrid"), entries);
 }
 
+function renderDeploymentIncident(payload) {
+  const incident = payload.deployment_incident || payload.engine_state?.deployment_incident;
+  const card = document.getElementById("deploymentIncidentCard");
+  if (!card) return;
+  if (!incident) {
+    card.hidden = true;
+    return;
+  }
+
+  card.hidden = false;
+  const status = incident.status || "reported";
+  const service = incident.service || "backend";
+  const environment = incident.environment || "production";
+  const observedAt = incident.observed_at_utc || incident.last_log_at_utc || payload.generated_at_utc;
+  const statusPill = document.getElementById("deploymentIncidentStatus");
+  if (statusPill) {
+    statusPill.className = `pill ${badgeClass(status)}`;
+    statusPill.textContent = `Status: ${fmt.text(status)}`;
+  }
+  setText("deploymentIncidentTitle", incident.title || `${service} deployment incident`);
+  setText("deploymentIncidentSummary", incident.summary || incident.impact || "Recent production deployment event recorded.");
+
+  const metaEntries = [
+    { label: "service", value: service, className: "mono" },
+    { label: "environment", value: environment },
+    { label: "observed", value: observedAt, className: "mono" },
+    { label: "severity", value: incident.severity || status, className: badgeClass(incident.severity || status) },
+  ];
+  renderKeyValues(document.getElementById("deploymentIncidentMeta"), metaEntries);
+
+  const actions = document.getElementById("deploymentIncidentActions");
+  const actionItems = incident.next_actions || [];
+  if (actions) {
+    actions.innerHTML = actionItems.length
+      ? `<h3>Next actions</h3><ul>${actionItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+      : "";
+  }
+
+  const log = document.getElementById("deploymentIncidentLog");
+  if (log) {
+    const lines = incident.log_excerpt || [];
+    log.textContent = lines.length ? lines.join("\n") : "No log excerpt recorded.";
+  }
+}
+
 function renderDashboard(payload) {
+  renderDeploymentIncident(payload);
   renderEngineState(payload);
 
   const trades = payload.recent_trades || [];
@@ -566,7 +643,7 @@ async function loadDashboard() {
     throw new Error(`Dashboard fetch failed: ${res.status}`);
   }
   const raw = await res.json();
-  const payload = (DASHBOARD_MODE === "remote" || DASHBOARD_MODE === "remoteControl") ? buildRemoteDashboardPayload(raw) : raw;
+  const payload = (DASHBOARD_MODE === "remote" || DASHBOARD_MODE === "remoteControl") ? buildRemoteDashboardPayload(raw) : normalizeDashboardPayload(raw);
   renderDashboard(payload);
   return payload;
 }
@@ -581,6 +658,14 @@ async function refreshDashboard() {
     console.error(error);
     const lastError = document.getElementById("lastErrorText");
     if (lastError) lastError.textContent = `Last error: ${error.message}`;
+    try {
+      const fallbackPayload = await loadBundledDashboardState();
+      renderDashboard(fallbackPayload);
+      if (lastError) lastError.textContent = `Last error: ${error.message}; showing bundled static state.`;
+    } catch (fallbackError) {
+      console.error(fallbackError);
+      if (lastError) lastError.textContent = `Last error: ${error.message}; static fallback failed: ${fallbackError.message}`;
+    }
   }
 
   try {

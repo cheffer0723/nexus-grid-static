@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-15T15:46:00Z",
+  "generated_at": "2026-05-13T15:01:00Z",
   "system_status": {
     "mode": "paper_spot",
     "running": true,
@@ -39,5 +39,27 @@
       "pnl_pct": -0.00285386,
       "timestamp_utc": "2026-04-15T15:24:17.243099Z"
     }
-  ]
+  ],
+  "deployment_incident": {
+    "status": "crashed",
+    "severity": "production_backend_unavailable",
+    "service": "critical-mass-lab",
+    "environment": "Railway production",
+    "observed_at_utc": "2026-05-13T12:58:00Z",
+    "last_log_at_utc": "2026-05-13T15:01:00Z",
+    "title": "Railway production import failure",
+    "summary": "The production backend crashed during startup because /app/main.py imports mvp.scripts.process_control.CONTROLLER, but the deployed package does not contain mvp.scripts.process_control.",
+    "impact": "Live backend reads and process-control actions may be unavailable from the static GitHub dashboard until the backend image includes the missing module or guards the optional import.",
+    "log_excerpt": [
+      "from main import app",
+      "File \"/app/main.py\", line 14, in <module>",
+      "from mvp.scripts.process_control import CONTROLLER",
+      "ModuleNotFoundError: No module named 'mvp.scripts.process_control'"
+    ],
+    "next_actions": [
+      "Redeploy the backend with mvp/scripts/process_control.py included in the package or Docker context.",
+      "If process control is optional in Railway, guard the import and expose read-only health/state endpoints without CONTROLLER.",
+      "Use this GitHub Pages deployment as a static informational fallback while Railway production is crashed."
+    ]
+  }
 }
