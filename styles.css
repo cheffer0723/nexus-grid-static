@@ -428,3 +428,32 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+.handoff-summary {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.handoff-list {
+  display: grid;
+  gap: 10px;
+}
+
+.handoff-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.handoff-item p {
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.45;
+}

@@ -61,5 +61,34 @@
       "If process control is optional in Railway, guard the import and expose read-only health/state endpoints without CONTROLLER.",
       "Use this GitHub Pages deployment as a static informational fallback while Railway production is crashed."
     ]
+  },
+  "workflow_handoff": {
+    "status": "blocked_in_static_repo",
+    "updated_at_utc": "2026-05-14T01:36:21Z",
+    "source": "Codex pickup check in /workspace/nexus-grid-static",
+    "summary": "Claude handoff referenced backend ML files and EC2/S3 work, but this checkout only contains the static dashboard. No BayForest/SignalForest model files or engine code are present here.",
+    "current_step": "Expose the pickup status on the command center while backend ML work waits for the correct repository or EC2 access.",
+    "tasks": [
+      {
+        "label": "Rename BayForest \u2192 SignalForest everywhere",
+        "status": "blocked",
+        "details": "Files such as mvp/ml/bayforest_v1_60m_binary.pkl, engine_cycle.py, and nexus_core adapters are not present in this static-dashboard repository."
+      },
+      {
+        "label": "Sync macro data from S3 and build labeled dataset",
+        "status": "pending",
+        "details": "Requires backend/EC2/S3 access; not available from this checkout."
+      },
+      {
+        "label": "Train liquidity regime classifier",
+        "status": "pending",
+        "details": "Requires labeled dataset and training code from the backend repository."
+      },
+      {
+        "label": "Wire liquidity regime classifier into engine",
+        "status": "pending",
+        "details": "Requires Nexus engine source files that are not present in this static repository."
+      }
+    ]
   }
 }

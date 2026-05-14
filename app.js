@@ -106,6 +106,7 @@ function buildRemoteDashboardPayload(raw) {
     regime_summary: raw?.regime_summary || { deterministic: [], ml: [], meta: { trade_count: 0 } },
     processes: raw?.processes || [],
     deployment_incident: raw?.deployment_incident || data?.deployment_incident,
+    workflow_handoff: raw?.workflow_handoff || raw?.handoff_status || data?.workflow_handoff || data?.handoff_status,
   });
 }
 
@@ -119,6 +120,7 @@ function normalizeDashboardPayload(raw) {
       regime_summary: raw.regime_summary || { deterministic: [], ml: [], meta: { trade_count: raw.recent_trades?.length || 0 } },
       processes: raw.processes || [],
       deployment_incident: raw.deployment_incident || raw.engine_state?.deployment_incident || null,
+      workflow_handoff: raw.workflow_handoff || raw.handoff_status || raw.engine_state?.workflow_handoff || raw.engine_state?.handoff_status || null,
     };
   }
 
@@ -130,6 +132,7 @@ function normalizeDashboardPayload(raw) {
     regime_summary: raw?.regime_summary || { deterministic: [], ml: [], meta: { trade_count: raw?.executions_recent?.length || 0 } },
     processes: raw?.processes || [],
     deployment_incident: raw?.deployment_incident || null,
+    workflow_handoff: raw?.workflow_handoff || raw?.handoff_status || null,
   };
 }
 
@@ -579,8 +582,74 @@ function renderDeploymentIncident(payload) {
   }
 }
 
+
+function handoffStatusClass(value) {
+  const normalized = String(value ?? "").toLowerCase();
+  if (normalized.includes("complete") || normalized.includes("done") || normalized.includes("committed")) return "ok";
+  if (normalized.includes("blocked") || normalized.includes("failed") || normalized.includes("error")) return "bad";
+  if (normalized.includes("progress") || normalized.includes("running") || normalized.includes("started")) return "warn";
+  return "neutral";
+}
+
+function renderWorkflowHandoff(payload) {
+  const handoff = payload.workflow_handoff || payload.engine_state?.workflow_handoff || payload.engine_state?.handoff_status;
+  const card = document.getElementById("workflowHandoffCard");
+  if (!card) return;
+  if (!handoff) {
+    card.hidden = true;
+    return;
+  }
+
+  card.hidden = false;
+  const status = handoff.status || "reported";
+  const statusPill = document.getElementById("workflowHandoffStatus");
+  if (statusPill) {
+    statusPill.className = `pill ${handoffStatusClass(status)}`;
+    statusPill.textContent = `Status: ${fmt.text(status)}`;
+  }
+
+  const summary = document.getElementById("workflowHandoffSummary");
+  if (summary) {
+    const lines = [
+      handoff.summary,
+      handoff.current_step ? `Current step: ${handoff.current_step}` : null,
+      handoff.updated_at_utc ? `Updated: ${handoff.updated_at_utc}` : null,
+      handoff.source ? `Source: ${handoff.source}` : null,
+    ].filter(Boolean);
+    summary.innerHTML = lines.length
+      ? lines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")
+      : "<p>No handoff summary recorded.</p>";
+  }
+
+  const list = document.getElementById("workflowHandoffList");
+  if (!list) return;
+  const tasks = handoff.tasks || handoff.steps || [];
+  if (!tasks.length) {
+    renderEmpty(list, "No task checklist recorded.");
+    return;
+  }
+
+  list.innerHTML = tasks
+    .map((task, index) => {
+      const label = task.label || task.name || task.task || `Task ${index + 1}`;
+      const taskStatus = task.status || "pending";
+      const details = task.details || task.note || task.summary || "";
+      return `
+        <div class="handoff-item">
+          <span class="badge ${handoffStatusClass(taskStatus)}">${escapeHtml(taskStatus)}</span>
+          <div>
+            <strong>${escapeHtml(label)}</strong>
+            ${details ? `<p>${escapeHtml(details)}</p>` : ""}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 function renderDashboard(payload) {
   renderDeploymentIncident(payload);
+  renderWorkflowHandoff(payload);
   renderEngineState(payload);
 
   const trades = payload.recent_trades || [];
